@@ -119,15 +119,14 @@ int ssh_connect(ssh_t *ssh, char *hostname, char *port, char *username) {
     struct addrinfo *sinfo;
     int status;
 
-	if((ssh->sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-	    return ssh_error_set(ssh, "socket", 1);
-
     memset(&hints, 0, sizeof(hints));
 
     if((status = getaddrinfo(hostname, port, &hints, &sinfo)) != 0)
         return ssh_error_network_set(ssh, "getaddrinfo", status, 1);
 
-    if((ssh->sockfd = socket(sinfo->ai_family, sinfo->ai_socktype, sinfo->ai_protocol)) < 0) {
+    // note: using sinfo->ai_protocol doesn't works reliably on macos
+
+    if((ssh->sockfd = socket(sinfo->ai_family, sinfo->ai_socktype, 0)) < 0) {
         return ssh_error_set(ssh, "socket", 1);
     }
 
