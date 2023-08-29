@@ -10,48 +10,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <ctype.h>
-
-typedef struct ssh_t {
-    // internals context
-    int sockfd;
-    LIBSSH2_SESSION *session;
-    LIBSSH2_CHANNEL *channel;
-    LIBSSH2_AGENT *agent;
-
-    // host information
-    const char *host;
-    const int port;
-
-    const char *fingerprint;
-    size_t fingerlength;
-
-    // user settings
-    char *username;
-    char *password;
-
-    // statistics
-    size_t bytesread;
-
-    // error handling
-    const char *comment;
-    const char *info;
-
-} ssh_t;
-
-typedef struct ssh_command_t {
-    const char *command;
-
-    // output buffer FIXME
-    char *stdout;
-
-    // exit status
-    int exitcode;
-    char *exitsignal;
-
-    // statistics
-    size_t bytesread;
-
-} ssh_command_t;
+#include "vssh.h"
 
 void ssh_error(ssh_t *ssh) {
     fprintf(stderr, "[-] ssh: %s: %s\n", ssh->comment, ssh->info);
@@ -373,8 +332,7 @@ int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
     return 0;
 }
 
-
-int main(int argc, char *argv[]) {
+int demo(int argc, char *argv[]) {
     char *host = "10.241.0.240";
     char *port = "22";
     // char *user = "admin";
@@ -430,10 +388,8 @@ int main(int argc, char *argv[]) {
     // ssh_execute(ssh, "/import file=zos-updated.rsc");
 #endif
 
-    /*
-    ssh_file_download(ssh, "/etc/passwd");
-    ssh_file_upload(ssh, "/etc/passwd", "/tmp/passwd-scp");
-    */
+    // ssh_file_download(ssh, "/etc/passwd");
+    // ssh_file_upload(ssh, "/etc/passwd", "/tmp/passwd-scp");
 
     ssh_execute(ssh, "uptime");
     ssh_execute(ssh, "uname -a");
@@ -445,4 +401,8 @@ int main(int argc, char *argv[]) {
     libssh2_exit();
 
     return 0;
+}
+
+int main(int argc, char *argv[]) {
+    return demo(argc, argv);
 }
