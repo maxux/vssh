@@ -403,6 +403,8 @@ int demo(int argc, char *argv[]) {
     return 0;
 }
 
+#ifndef VSSH_NO_MAIN
 int main(int argc, char *argv[]) {
     return demo(argc, argv);
 }
+#endif
