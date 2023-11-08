@@ -65,6 +65,7 @@
 
     int ssh_authenticate_agent(ssh_t *ssh, char *username);
     int ssh_authenticate_password(ssh_t *ssh, char *username, char *password);
+    int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password);
     int ssh_command_read(ssh_t *ssh, ssh_command_t *command);
 
     int ssh_execute(ssh_t *ssh, char *command);
