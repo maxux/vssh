@@ -95,7 +95,7 @@ int ssh_connect(ssh_t *ssh, char *hostname, char *port) {
     memset(&hints, 0, sizeof(hints));
 
     debug("[+] connecting to ssh session\n");
-    debug("[+] host: <%s>, port: %s\n", hostname, port);
+    debug("[+] remote host: [%s:%s]\n", hostname, port);
 
     if((status = getaddrinfo(hostname, port, &hints, &sinfo)) != 0)
         return ssh_error_network_set(ssh, "getaddrinfo", status, 1);
@@ -202,10 +202,34 @@ int ssh_authenticate_agent(ssh_t *ssh, char *username) {
 }
 
 int ssh_authenticate_password(ssh_t *ssh, char *username, char *password) {
+    ssh->username = strdup(username);
+
     if(libssh2_userauth_password(ssh->session, ssh->username, password) != 0)
         return 1;
 
+    return 0;
+}
+
+static LIBSSH2_USERAUTH_KBDINT_RESPONSE_FUNC(ssh_kbi_callback) {
+    ssh_t *ssh = (ssh_t *) *abstract;
+
+    if(num_prompts == 1) {
+        responses[0].text = strdup(ssh->password);
+        responses[0].length = (unsigned int) strlen(ssh->password);
+    }
+}
+
+int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password) {
     ssh->username = strdup(username);
+    ssh->password = strdup(password);
+
+    if(libssh2_userauth_keyboard_interactive(ssh->session, ssh->username, ssh_kbi_callback) != 0)
+        return 1;
+
+    // remove password from memory
+    memset(ssh->password, 0x00, strlen(password));
+    free(ssh->password);
+    ssh->password = NULL;
 
     return 0;
 }
@@ -395,20 +419,34 @@ int demo(int argc, char *argv[]) {
     free(finger);
 
 
-#if 1
+#if 0
     printf("[+] authenticating using ssh-agent\n");
     if(ssh_authenticate_agent(ssh, user))
        return 1;
 #endif
 
 #if 0
-    printf("[+] authenticating using password\n");
-    char *password = "admin";
+    printf("[+] authenticating using simple password\n");
+    // char *password = "admin";
+    char *password = "aaaa";
     if(ssh_authenticate_password(ssh, user, password)) {
         printf("[-] authentication failed\n");
         return 1;
     }
 
+#endif
+
+#if 1
+    printf("[+] authenticating using keyboard-interactive\n");
+    char *password = "aaaa";
+    if(ssh_authenticate_kb_interactive(ssh, user, password)) {
+        printf("[-] authentication failed\n");
+        return 1;
+    }
+
+#endif
+
+#if 0
     ssh_execute(ssh, "/system resource print");
     ssh_execute(ssh, "/export file=zos");
     if(ssh_file_download(ssh, "zos.rsc", "/tmp/zos.rsc"))
