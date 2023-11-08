@@ -64,7 +64,8 @@ ssh_t *ssh_initialize() {
         return NULL;
     }
 
-    if(!(ssh->session = libssh2_session_init())) {
+    // set our ssh pointer as session abstract to access it inside callback
+    if(!(ssh->session = libssh2_session_init_ex(NULL, NULL, NULL, (void *) ssh))) {
         free(ssh);
         return NULL;
     }
