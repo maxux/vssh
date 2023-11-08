@@ -11,8 +11,8 @@
         LIBSSH2_AGENT *agent;
 
         // host information
-        const char *host;
-        const int port;
+        char *host;
+        int port;
 
         const char *fingerprint;
         size_t fingerlength;
@@ -47,6 +47,7 @@
 
 
     void ssh_error(ssh_t *ssh);
+    char *ssh_error_str(ssh_t *ssh);
     int ssh_error_set(ssh_t *ssh, char *comment, int value);
     int ssh_error_network_set(ssh_t *ssh, char *comment, int error, int value);
     int ssh_error_custom_set(ssh_t *ssh, char *comment, char *error, int value);

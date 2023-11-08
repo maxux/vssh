@@ -12,8 +12,17 @@
 #include <ctype.h>
 #include "vssh.h"
 
+#define debug printf
+
 void ssh_error(ssh_t *ssh) {
     fprintf(stderr, "[-] ssh: %s: %s\n", ssh->comment, ssh->info);
+}
+
+char *ssh_error_str(ssh_t *ssh) {
+    char buffer[1024];
+    sprintf(buffer, "%s: %s", ssh->comment, ssh->info);
+
+    return strdup(buffer);
 }
 
 // system error
@@ -73,6 +82,7 @@ void ssh_free(ssh_t *ssh) {
 
     libssh2_session_free(ssh->session);
     free(ssh->username);
+    free(ssh->host);
     free(ssh);
 }
 
@@ -82,6 +92,9 @@ int ssh_connect(ssh_t *ssh, char *hostname, char *port, char *username) {
     int status;
 
     memset(&hints, 0, sizeof(hints));
+
+    debug("[+] connecting to ssh session\n");
+    debug("[+] host: <%s>, port: %s\n", hostname, port);
 
     if((status = getaddrinfo(hostname, port, &hints, &sinfo)) != 0)
         return ssh_error_network_set(ssh, "getaddrinfo", status, 1);
@@ -101,6 +114,8 @@ int ssh_connect(ssh_t *ssh, char *hostname, char *port, char *username) {
 
     // link username to context
     ssh->username = strdup(username);
+    ssh->host = strdup(hostname);
+    ssh->port = atoi(port);
 
 	return 0;
 }
