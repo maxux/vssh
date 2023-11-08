@@ -1,6 +1,9 @@
 import maxux.vssh
 
-vssh.test()
+x := vssh.new("10.241.0.240", 22)!
+println(x.fingerprint())
+println(x.authenticate(.agent, "root", "")!)
 
-x := vssh.new(.agent, "", "hello", "")!
-y := vssh.new(.password, "", "hello", "world")!
+y := vssh.new("10.241.0.230", 22)!
+println(y.fingerprint())
+println(y.authenticate(.keyboard_interactive, "vssh", "aaaa")!)
