@@ -61,6 +61,7 @@
     int ssh_handshake(ssh_t *ssh);
 
     void ssh_fingerprint_dump(ssh_t *ssh);
+    char *ssh_fingerprint_hex(ssh_t *ssh);
 
     int ssh_authenticate_agent(ssh_t *ssh);
     int ssh_authenticate_password(ssh_t *ssh, char *password);

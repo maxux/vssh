@@ -130,8 +130,11 @@ int ssh_handshake(ssh_t *ssh) {
     if(libssh2_session_handshake(ssh->session, ssh->sockfd) < 0)
         return 1;
 
-    if(!(ssh->fingerprint = libssh2_session_hostkey(ssh->session, &ssh->fingerlength, &fingertype)))
+    if(!(ssh->fingerprint = libssh2_hostkey_hash(ssh->session, LIBSSH2_HOSTKEY_HASH_SHA1)))
         return 1;
+
+    if(ssh->fingerprint)
+        ssh->fingerlength = 20; // sha-1
 
     return 0;
 }
@@ -145,6 +148,19 @@ void ssh_fingerprint_dump(ssh_t *ssh) {
     printf("0x");
     for(size_t i = 0; i < 20; i++)
         printf("%02x", (unsigned char) ssh->fingerprint[i]);
+}
+
+char *ssh_fingerprint_hex(ssh_t *ssh) {
+    char buffer[1024];
+
+    if(ssh->fingerlength < 20)
+        return NULL;
+
+    sprintf(buffer, "0x");
+    for(size_t i = 0; i < 20; i++)
+        sprintf(buffer + (i * 2) + 2, "%02x", (unsigned char) ssh->fingerprint[i]);
+
+    return strdup(buffer);
 }
 
 int ssh_authenticate_agent(ssh_t *ssh) {
@@ -371,9 +387,10 @@ int demo(int argc, char *argv[]) {
 
     printf("[+] ssh session established\n");
 
-    printf("[+] host fingerprint: ");
-    ssh_fingerprint_dump(ssh);
-    printf("\n");
+    char *finger = ssh_fingerprint_hex(ssh);
+    printf("[+] host fingerprint: %s\n", finger);
+    free(finger);
+
 
 #if 1
     printf("[+] authenticating using ssh-agent\n");
