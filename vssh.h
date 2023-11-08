@@ -55,7 +55,7 @@
 
     ssh_t *ssh_initialize();
     void ssh_free(ssh_t *ssh);
-    int ssh_connect(ssh_t *ssh, char *hostname, char *port, char *username);
+    int ssh_connect(ssh_t *ssh, char *hostname, char *port);
 
     void ssh_session_disconnect(ssh_t *ssh);
     int ssh_handshake(ssh_t *ssh);
@@ -63,8 +63,8 @@
     void ssh_fingerprint_dump(ssh_t *ssh);
     char *ssh_fingerprint_hex(ssh_t *ssh);
 
-    int ssh_authenticate_agent(ssh_t *ssh);
-    int ssh_authenticate_password(ssh_t *ssh, char *password);
+    int ssh_authenticate_agent(ssh_t *ssh, char *username);
+    int ssh_authenticate_password(ssh_t *ssh, char *username, char *password);
     int ssh_command_read(ssh_t *ssh, ssh_command_t *command);
 
     int ssh_execute(ssh_t *ssh, char *command);

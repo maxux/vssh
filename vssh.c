@@ -86,7 +86,7 @@ void ssh_free(ssh_t *ssh) {
     free(ssh);
 }
 
-int ssh_connect(ssh_t *ssh, char *hostname, char *port, char *username) {
+int ssh_connect(ssh_t *ssh, char *hostname, char *port) {
     struct addrinfo hints;
     struct addrinfo *sinfo;
     int status;
@@ -112,8 +112,7 @@ int ssh_connect(ssh_t *ssh, char *hostname, char *port, char *username) {
 
     freeaddrinfo(sinfo);
 
-    // link username to context
-    ssh->username = strdup(username);
+    // keep track of host and port in context
     ssh->host = strdup(hostname);
     ssh->port = atoi(port);
 
@@ -163,12 +162,13 @@ char *ssh_fingerprint_hex(ssh_t *ssh) {
     return strdup(buffer);
 }
 
-int ssh_authenticate_agent(ssh_t *ssh) {
+int ssh_authenticate_agent(ssh_t *ssh, char *username) {
     struct libssh2_agent_publickey *identity, *prev_identity = NULL;
     int rc;
 
     printf("[+] initializing ssh-agent connection\n");
     ssh->agent = libssh2_agent_init(ssh->session);
+    ssh->username = strdup(username);
 
     if(!ssh->agent)
         return ssh_error_custom_set(ssh, "agent", "could not initialize agent support", 1);
@@ -200,9 +200,11 @@ int ssh_authenticate_agent(ssh_t *ssh) {
     return 2;
 }
 
-int ssh_authenticate_password(ssh_t *ssh, char *password) {
+int ssh_authenticate_password(ssh_t *ssh, char *username, char *password) {
     if(libssh2_userauth_password(ssh->session, ssh->username, password) != 0)
         return 1;
+
+    ssh->username = strdup(username);
 
     return 0;
 }
@@ -376,7 +378,7 @@ int demo(int argc, char *argv[]) {
     ssh_t *ssh = ssh_initialize();
 
     printf("[+] initializing connection: %s:%s\n", host, port);
-    if(ssh_connect(ssh, host, port, user))
+    if(ssh_connect(ssh, host, port))
         ssh_diep(ssh);
 
     printf("[+] connection established\n");
@@ -394,14 +396,14 @@ int demo(int argc, char *argv[]) {
 
 #if 1
     printf("[+] authenticating using ssh-agent\n");
-    if(ssh_authenticate_agent(ssh))
+    if(ssh_authenticate_agent(ssh, user))
        return 1;
 #endif
 
 #if 0
     printf("[+] authenticating using password\n");
     char *password = "admin";
-    if(ssh_authenticate_password(ssh, password)) {
+    if(ssh_authenticate_password(ssh, user, password)) {
         printf("[-] authentication failed\n");
         return 1;
     }
