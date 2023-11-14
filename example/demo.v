@@ -2,8 +2,12 @@ import maxux.vssh
 
 x := vssh.new("10.241.0.240", 22)!
 println(x.fingerprint())
-println(x.authenticate(.agent, "root", "")!)
+x.authenticate(.agent, "root", "")!
+x.execute("uname -a")!
+x.disconnect()
 
 y := vssh.new("10.241.0.230", 22)!
 println(y.fingerprint())
-println(y.authenticate(.keyboard_interactive, "vssh", "aaaa")!)
+y.authenticate(.keyboard_interactive, "vssh", "aaaa")!
+y.disconnect()
+

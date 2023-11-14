@@ -25,6 +25,10 @@ fn C.ssh_authenticate_password(&C.ssh_t, &u8, &u8) int
 
 fn C.ssh_authenticate_kb_interactive(&C.ssh_t, &u8, &u8) int
 
+fn C.ssh_execute(&C.ssh_t, &u8) int
+
+fn C.ssh_session_disconnect(&C.ssh_t)
+
 pub enum Authentication {
 	agent
 	password
@@ -36,6 +40,7 @@ struct SSH2 {
 	host string
 	port string
 	user string
+	authenticated int
 }
 
 fn ssh_fetch_error(ssh SSH2) string {
@@ -47,6 +52,8 @@ pub fn new(host string, port int) !SSH2 {
 	ssh := SSH2{}
 
 	ssh.kntxt = C.ssh_initialize()
+	ssh.authenticated = -1
+
 	sport := "${port}"
 
 	val := C.ssh_connect(ssh.kntxt, host.str, sport.str)
@@ -69,30 +76,32 @@ pub fn (s SSH2) fingerprint() string {
 
 fn (s SSH2) authenticate_agent(user string) !bool {
 	println("-- authenticating using agent")
-	a := C.ssh_authenticate_agent(s.kntxt, user.str)
-	println(a)
+	if C.ssh_authenticate_agent(s.kntxt, user.str) > 0 {
+		return error(ssh_fetch_error(s))
+	}
 
-	return false
+	s.authenticated = Authentication.agent
+	return true
 }
 
 fn (s SSH2) authenticate_password(user string, pass string) !bool {
 	println("-- authenticating using password")
-	a := C.ssh_authenticate_password(s.kntxt, user.str, pass.str)
-	println(a)
+	if C.ssh_authenticate_password(s.kntxt, user.str, pass.str) > 0 {
+		return error(ssh_fetch_error(s))
+	}
 
-	println(ssh_fetch_error(s))
-
-	return false
+	s.authenticated = Authentication.password
+	return true
 }
 
 fn (s SSH2) authenticate_kb_interactive(user string, pass string) !bool {
 	println("-- authenticating using keyboard interactive ")
-	a := C.ssh_authenticate_kb_interactive(s.kntxt, user.str, pass.str)
-	println(a)
+	if C.ssh_authenticate_kb_interactive(s.kntxt, user.str, pass.str) > 0 {
+		return error(ssh_fetch_error(s))
+	}
 
-	println(ssh_fetch_error(s))
-
-	return false
+	s.authenticated = Authentication.keyboard_interactive
+	return true
 }
 
 
