@@ -31,7 +31,7 @@
     } ssh_t;
 
     typedef struct ssh_command_t {
-        const char *command;
+        char *command;
 
         // output buffer FIXME
         char *stdout;
@@ -68,7 +68,7 @@
     int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password);
     int ssh_command_read(ssh_t *ssh, ssh_command_t *command);
 
-    int ssh_execute(ssh_t *ssh, char *command);
+    ssh_command_t *ssh_execute(ssh_t *ssh, char *command);
 
     int ssh_file_download(ssh_t *ssh, char *remotepath, char *localpath);
     int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile);

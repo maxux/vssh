@@ -252,36 +252,33 @@ int ssh_command_read(ssh_t *ssh, ssh_command_t *command) {
     }
 }
 
-int ssh_execute(ssh_t *ssh, char *command) {
+ssh_command_t *ssh_execute(ssh_t *ssh, char *command) {
     int rc;
 
-    if((ssh->channel = libssh2_channel_open_session(ssh->session)) == NULL)
-        return ssh_error_custom_set(ssh, "session", "could not create session channel", 1);
+    if((ssh->channel = libssh2_channel_open_session(ssh->session)) == NULL) {
+        ssh_error_custom_set(ssh, "session", "could not create session channel", 1);
+        return NULL;
+    }
 
     printf("[+] executing: %s\n", command);
 
     if((rc = libssh2_channel_exec(ssh->channel, command)) != 0)
-        return 1;
+        return NULL;
 
-    ssh_command_t cmd = {.bytesread = 0};
-    ssh_command_read(ssh, &cmd);
+    ssh_command_t *cmd = calloc(sizeof(ssh_command_t), 1);
+    cmd->command = strdup(command);
+    ssh_command_read(ssh, cmd);
 
-    int exitcode = 127;
     rc = libssh2_channel_close(ssh->channel);
 
-    char *exitsignal;
-
     if(rc == 0) {
-        exitcode = libssh2_channel_get_exit_status(ssh->channel);
-
-        libssh2_channel_get_exit_signal(ssh->channel, &exitsignal, NULL, NULL, NULL, NULL, NULL);
+        cmd->exitcode = libssh2_channel_get_exit_status(ssh->channel);
+        libssh2_channel_get_exit_signal(ssh->channel, &cmd->exitsignal, NULL, NULL, NULL, NULL, NULL);
     }
-
-    printf("Exit: %d, signal: %s\n", exitcode, exitsignal);
 
     libssh2_channel_free(ssh->channel);
 
-    return 0;
+    return cmd;
 }
 
 int ssh_file_download(ssh_t *ssh, char *remotepath, char *localpath) {
@@ -390,8 +387,14 @@ int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
     return 0;
 }
 
+void ssh_command_free(ssh_command_t *cmd) {
+    free(cmd->command);
+    free(cmd->exitsignal);
+    free(cmd);
+}
+
 int demo(int argc, char *argv[]) {
-    char *host = "10.241.0.240";
+    char *host = "10.241.0.230";
     char *port = "22";
     // char *user = "admin";
     char *user = "root";
@@ -419,7 +422,7 @@ int demo(int argc, char *argv[]) {
     free(finger);
 
 
-#if 0
+#if 1
     printf("[+] authenticating using ssh-agent\n");
     if(ssh_authenticate_agent(ssh, user))
        return 1;
@@ -436,7 +439,7 @@ int demo(int argc, char *argv[]) {
 
 #endif
 
-#if 1
+#if 0
     printf("[+] authenticating using keyboard-interactive\n");
     char *password = "aaaa";
     if(ssh_authenticate_kb_interactive(ssh, user, password)) {
@@ -464,7 +467,14 @@ int demo(int argc, char *argv[]) {
     // ssh_file_download(ssh, "/etc/passwd");
     // ssh_file_upload(ssh, "/etc/passwd", "/tmp/passwd-scp");
 
-    ssh_execute(ssh, "uptime");
+    ssh_command_t *cmd = ssh_execute(ssh, "uptime");
+    if(cmd) {
+        printf("<< command: %s\n", cmd->command);
+        printf("<< exit code: %d\n", cmd->exitcode);
+        printf("<< exit signal: %s\n", cmd->exitsignal);
+        printf("<< bytes read: %ld\n", cmd->bytesread);
+    }
+
     ssh_execute(ssh, "uname -a");
     ssh_execute(ssh, "false");
 
