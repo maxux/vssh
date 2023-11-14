@@ -25,7 +25,7 @@ fn C.ssh_authenticate_password(&C.ssh_t, &u8, &u8) int
 
 fn C.ssh_authenticate_kb_interactive(&C.ssh_t, &u8, &u8) int
 
-fn C.ssh_execute(&C.ssh_t, &u8) int
+fn C.ssh_execute(&C.ssh_t, &u8) &C.ssh_command_t
 
 fn C.ssh_session_disconnect(&C.ssh_t)
 
@@ -123,6 +123,14 @@ pub fn (s SSH2) authenticate(method Authentication, user string, pass string) !b
 	return error("unknown authenticating method")
 }
 
-pub fn test() {
-	println("Hello world")
+pub fn (s SSH2) execute(command string) !int {
+	if C.ssh_execute(s.kntxt, command.str) == 0 { // FIXME
+		return error("could not execute")
+	}
+
+	return 0
+}
+
+pub fn (s SSH2) disconnect() {
+	C.ssh_session_disconnect(s.kntxt)
 }
