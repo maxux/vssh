@@ -33,8 +33,12 @@
     typedef struct ssh_command_t {
         char *command;
 
-        // output buffer FIXME
-        char *stdout;
+        // keep a list of buffers for stdout
+        // this avoid to keep a single buffer to enlarge each time
+        char **stdout;
+        size_t *stdlens;
+        size_t stdouts;
+        size_t stdalloc;
 
         // exit status
         int exitcode;
@@ -45,6 +49,7 @@
 
     } ssh_command_t;
 
+    typedef void (*ssh_execute_cb_t)(ssh_t *, ssh_command_t *cmd, char *buffer, size_t length);
 
     void ssh_error(ssh_t *ssh);
     char *ssh_error_str(ssh_t *ssh);
@@ -66,7 +71,6 @@
     int ssh_authenticate_agent(ssh_t *ssh, char *username);
     int ssh_authenticate_password(ssh_t *ssh, char *username, char *password);
     int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password);
-    int ssh_command_read(ssh_t *ssh, ssh_command_t *command);
 
     ssh_command_t *ssh_execute(ssh_t *ssh, char *command);
 

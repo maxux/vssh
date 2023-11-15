@@ -234,7 +234,21 @@ int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password) 
     return 0;
 }
 
-int ssh_command_read(ssh_t *ssh, ssh_command_t *command) {
+static int ssh_stdout_resize(ssh_command_t *cmd) {
+    if(!(cmd->stdout = realloc(cmd->stdout, sizeof(char *) * cmd->stdouts)))
+        return 1;
+
+    if(!(cmd->stdlens = realloc(cmd->stdlens, sizeof(size_t) * cmd->stdouts)))
+        return 1;
+
+    return 0;
+}
+
+static int ssh_stdout_need_resize(ssh_command_t *cmd) {
+    return (cmd->stdalloc >= cmd->stdouts - 1);
+}
+
+static int ssh_command_read(ssh_t *ssh, ssh_command_t *command, ssh_execute_cb_t cb) {
     int length;
     char buffer[8192];
 
@@ -245,14 +259,28 @@ int ssh_command_read(ssh_t *ssh, ssh_command_t *command) {
         command->bytesread += length;
         ssh->bytesread += length;
 
-        // fprintf(stderr, "----------------------------\n");
-        fwrite(buffer, length, 1, stdout);
-        fflush(stdout);
-        // fprintf(stderr, "----------------------------\n");
+        // enlarge stdout buffer if not large enough
+        if(ssh_stdout_need_resize(command)) {
+            command->stdouts += 16;
+            ssh_stdout_resize(command);
+        }
+
+        printf("feeding alloc %lu -- %d\n", command->stdalloc, length);
+
+        command->stdout[command->stdalloc] = malloc(length);
+        command->stdlens[command->stdalloc] = length;
+
+        memcpy(command->stdout[command->stdalloc], buffer, length);
+
+        command->stdalloc += 1;
+
+        if(cb)
+            cb(ssh, command, buffer, length);
+
     }
 }
 
-ssh_command_t *ssh_execute(ssh_t *ssh, char *command) {
+static ssh_command_t *ssh_execute_callback(ssh_t *ssh, char *command, ssh_execute_cb_t cb) {
     int rc;
 
     if((ssh->channel = libssh2_channel_open_session(ssh->session)) == NULL) {
@@ -266,8 +294,14 @@ ssh_command_t *ssh_execute(ssh_t *ssh, char *command) {
         return NULL;
 
     ssh_command_t *cmd = calloc(sizeof(ssh_command_t), 1);
+    if(!cmd)
+        return NULL;
+
+    cmd->stdouts = 16;
+    ssh_stdout_resize(cmd);
+
     cmd->command = strdup(command);
-    ssh_command_read(ssh, cmd);
+    ssh_command_read(ssh, cmd, cb);
 
     rc = libssh2_channel_close(ssh->channel);
 
@@ -279,6 +313,32 @@ ssh_command_t *ssh_execute(ssh_t *ssh, char *command) {
     libssh2_channel_free(ssh->channel);
 
     return cmd;
+}
+
+ssh_command_t *ssh_execute(ssh_t *ssh, char *command) {
+    return ssh_execute_callback(ssh, command, NULL);
+}
+
+// print buffer on the console
+static void ssh_execute_stream_cb(ssh_t *ssh, ssh_command_t *command, char *buffer, size_t length) {
+    fwrite(buffer, length, 1, stdout);
+    fflush(stdout);
+}
+
+ssh_command_t *ssh_execute_stream(ssh_t *ssh, char *command) {
+    return ssh_execute_callback(ssh, command, ssh_execute_stream_cb);
+}
+
+char *ssh_command_stdout_get(ssh_command_t *command) {
+    char *output = malloc(command->bytesread);
+    size_t reminder = 0;
+
+    for(int i = 0; i < command->stdalloc; i++) {
+        memcpy(output + reminder, command->stdout[i], command->stdlens[i]);
+        reminder += command->stdlens[i];
+    }
+
+    return output;
 }
 
 int ssh_file_download(ssh_t *ssh, char *remotepath, char *localpath) {
@@ -388,6 +448,11 @@ int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
 }
 
 void ssh_command_free(ssh_command_t *cmd) {
+    for(int i = 0; i < cmd->stdalloc; i++)
+        free(cmd->stdout[i]);
+
+    free(cmd->stdlens);
+    free(cmd->stdout);
     free(cmd->command);
     free(cmd->exitsignal);
     free(cmd);
@@ -467,16 +532,24 @@ int demo(int argc, char *argv[]) {
     // ssh_file_download(ssh, "/etc/passwd");
     // ssh_file_upload(ssh, "/etc/passwd", "/tmp/passwd-scp");
 
-    ssh_command_t *cmd = ssh_execute(ssh, "uptime");
+    ssh_command_t *cmd = ssh_execute_stream(ssh, "dmidecode");
     if(cmd) {
         printf("<< command: %s\n", cmd->command);
         printf("<< exit code: %d\n", cmd->exitcode);
         printf("<< exit signal: %s\n", cmd->exitsignal);
         printf("<< bytes read: %ld\n", cmd->bytesread);
-    }
 
-    ssh_execute(ssh, "uname -a");
-    ssh_execute(ssh, "false");
+        char *x = ssh_command_stdout_get(cmd);
+        // fwrite(x, cmd->bytesread, 1, stdout);
+        free(x);
+    }
+    ssh_command_free(cmd);
+
+    cmd = ssh_execute(ssh, "uname -a");
+    ssh_command_free(cmd);
+
+    cmd = ssh_execute(ssh, "false");
+    ssh_command_free(cmd);
 
     ssh_session_disconnect(ssh);
     ssh_free(ssh);
