@@ -205,7 +205,7 @@ int ssh_authenticate_password(ssh_t *ssh, char *username, char *password) {
     ssh->username = strdup(username);
 
     if(libssh2_userauth_password(ssh->session, ssh->username, password) != 0)
-        return 1;
+        return ssh_error_custom_set(ssh, "password", "authentication failed", 1);
 
     return 0;
 }
@@ -224,7 +224,7 @@ int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password) 
     ssh->password = strdup(password);
 
     if(libssh2_userauth_keyboard_interactive(ssh->session, ssh->username, ssh_kbi_callback) != 0)
-        return 1;
+        return ssh_error_custom_set(ssh, "keyboard-interactive", "authentication failed", 1);
 
     // remove password from memory
     memset(ssh->password, 0x00, strlen(password));
