@@ -321,6 +321,26 @@ ssh_command_t *ssh_execute(ssh_t *ssh, char *command) {
     return ssh_execute_callback(ssh, command, NULL);
 }
 
+void ssh_command_dump(ssh_command_t *cmd) {
+    if(!cmd) {
+        printf("[-] invalid command object\n");
+        return;
+    }
+
+
+    printf("[+] command executed: <%s>\n", cmd->command);
+    printf("[+] command exit code: %d\n", cmd->exitcode);
+    printf("[+] command exit signal: %s\n", cmd->exitsignal);
+    printf("[+] command bytes read: %ld\n", cmd->bytesread);
+
+    printf("[+] command output:\n");
+    char *x = ssh_command_stdout_get(cmd);
+    fwrite(x, cmd->bytesread, 1, stdout);
+    free(x);
+
+    printf("[+] ----\n");
+}
+
 // print buffer on the console
 static void ssh_execute_stream_cb(ssh_t *ssh, ssh_command_t *command, char *buffer, size_t length) {
     fwrite(buffer, length, 1, stdout);
