@@ -12,7 +12,11 @@
 #include <ctype.h>
 #include "vssh.h"
 
-#define debug printf
+#ifndef NDEBUG
+    #define debug printf
+#else
+    #define debug (void)sizeof
+#endif
 
 void ssh_error(ssh_t *ssh) {
     fprintf(stderr, "[-] ssh: %s: %s\n", ssh->comment, ssh->info);
@@ -167,7 +171,7 @@ int ssh_authenticate_agent(ssh_t *ssh, char *username) {
     struct libssh2_agent_publickey *identity, *prev_identity = NULL;
     int rc;
 
-    printf("[+] initializing ssh-agent connection\n");
+    debug("[+] initializing ssh-agent connection\n");
     ssh->agent = libssh2_agent_init(ssh->session);
     ssh->username = strdup(username);
 
@@ -188,16 +192,16 @@ int ssh_authenticate_agent(ssh_t *ssh, char *username) {
             return ssh_error_custom_set(ssh, "agent", "could not obtain identity to ssh-agent", 1);
 
         if((rc = libssh2_agent_userauth(ssh->agent, ssh->username, identity)) == 0) {
-            printf("[+] authenticating %s with %s succeed\n", ssh->username, identity->comment);
+            debug("[+] authenticating %s with %s succeed\n", ssh->username, identity->comment);
             return 0;
         }
 
-        printf("[+] authenticating %s with %s failed\n", ssh->username, identity->comment);
+        debug("[+] authenticating %s with %s failed\n", ssh->username, identity->comment);
 
         prev_identity = identity;
     }
 
-    printf("[+] no identities could authenticate user %s\n", ssh->username);
+    debug("[+] no identities could authenticate user %s\n", ssh->username);
     return 2;
 }
 
@@ -265,8 +269,6 @@ static int ssh_command_read(ssh_t *ssh, ssh_command_t *command, ssh_execute_cb_t
             ssh_stdout_resize(command);
         }
 
-        printf("feeding alloc %lu -- %d\n", command->stdalloc, length);
-
         command->stdout[command->stdalloc] = malloc(length);
         command->stdlens[command->stdalloc] = length;
 
@@ -288,7 +290,7 @@ static ssh_command_t *ssh_execute_callback(ssh_t *ssh, char *command, ssh_execut
         return NULL;
     }
 
-    printf("[+] executing: %s\n", command);
+    debug("[+] executing: %s\n", command);
 
     if((rc = libssh2_channel_exec(ssh->channel, command)) != 0)
         return NULL;
@@ -341,13 +343,28 @@ char *ssh_command_stdout_get(ssh_command_t *command) {
     return output;
 }
 
-int ssh_file_download(ssh_t *ssh, char *remotepath, char *localpath) {
+static void ssh_scp_progress_cb(ssh_t *ssh, char *source, char *destination, size_t xfer, size_t length) {
+    if(xfer == 0) {
+        printf("[+] initializing transfert...\n");
+        fflush(stdout);
+        return;
+    }
+
+    printf("\r[+] transfert: %lu / %lu bytes [%02.0f %%]", xfer, length, ((double) xfer / length) * 100.0);
+
+    if(xfer == length)
+        printf(" done.\n");
+
+    fflush(stdout);
+}
+
+int ssh_file_download_progress(ssh_t *ssh, char *remotepath, char *localpath, ssh_scp_cb_t progress) {
     libssh2_struct_stat fileinfo;
     ssize_t got = 0;
     int length;
     int fd;
 
-    printf("[+] preparing to download remote file: %s -> %s\n", remotepath, localpath);
+    debug("[+] preparing to download remote file: %s -> %s\n", remotepath, localpath);
 
     if((ssh->channel = libssh2_scp_recv2(ssh->session, remotepath, &fileinfo)) == NULL)
         return ssh_error_custom_set(ssh, "session", "could not create scp session channel", 1);
@@ -435,10 +452,15 @@ int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
 
         } while(length);
 
+        if(progress)
+            progress(ssh, localfile, remotefile, sent, sb.st_size);
+
+        sent += length;
+
     } while(1);
 
-    printf(" sent.\n");
-    printf("[+] waiting for scp termination\n");
+    debug(" sent.\n");
+    debug("[+] waiting for scp termination\n");
 
     libssh2_channel_send_eof(ssh->channel);
     libssh2_channel_wait_eof(ssh->channel);
