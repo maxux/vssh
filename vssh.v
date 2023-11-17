@@ -1,4 +1,5 @@
-[translated]
+@[translated]
+
 module vssh
 
 #include "@VMODROOT/vssh.h"
@@ -7,9 +8,17 @@ module vssh
 #flag -lssh2
 #flag -DVSSH_NO_MAIN
 
+// warning workaround
+struct C.ssh_t{}
+struct C.ssh_command_t{}
+
+pub type FnSSHExecuteCB = fn(ssh &C.ssh_t, cmd &C.ssh_command_t, buffer &char, length usize)
+
+pub type FnSSHScpCB = fn(ssh &C.ssh_t, cmd &C.ssh_command_t, sent usize, length usize)
+
 fn C.ssh_initialize() &C.ssh_t
 
-fn C.ssh_connect(&C.ssh_t, &u8, &u8) int
+fn C.ssh_connect(&C.ssh_t, &char, &char) int
 
 fn C.ssh_error(&C.ssh_t)
 
@@ -19,13 +28,15 @@ fn C.ssh_fingerprint_hex(&C.ssh_t) &char
 
 fn C.ssh_handshake(&C.ssh_t) int
 
-fn C.ssh_authenticate_agent(&C.ssh_t, &u8) int
+fn C.ssh_authenticate_agent(&C.ssh_t, &char) int
 
-fn C.ssh_authenticate_password(&C.ssh_t, &u8, &u8) int
+fn C.ssh_authenticate_password(&C.ssh_t, &char, &char) int
 
-fn C.ssh_authenticate_kb_interactive(&C.ssh_t, &u8, &u8) int
+fn C.ssh_authenticate_kb_interactive(&C.ssh_t, &char, &char) int
 
-fn C.ssh_execute(&C.ssh_t, &u8) &C.ssh_command_t
+fn C.ssh_execute(&C.ssh_t, &char) &C.ssh_command_t
+
+fn C.ssh_execute_callback(&C.ssh_t, &char, cb FnSSHExecuteCB) &C.ssh_command_t
 
 fn C.ssh_session_disconnect(&C.ssh_t)
 
@@ -128,6 +139,18 @@ pub fn (s SSH2) execute(command string) !int {
 		return error("could not execute")
 	}
 
+	return 0
+}
+
+fn stream_stdout(ssh &C.ssh_t, cmd &C.ssh_command_t, buffer &char, length usize) {
+	println(">>>> STREAM")
+	i := int(length)
+	a := unsafe { buffer.vstring_with_len(i) }
+	println(a)
+}
+
+pub fn (s SSH2) stream(command string) !int {
+	C.ssh_execute_callback(s.kntxt, command.str, stream_stdout)
 	return 0
 }
 
