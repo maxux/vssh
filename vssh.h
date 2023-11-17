@@ -50,6 +50,7 @@
     } ssh_command_t;
 
     typedef void (*ssh_execute_cb_t)(ssh_t *, ssh_command_t *cmd, char *buffer, size_t length);
+    typedef void (*ssh_scp_cb_t)(ssh_t *, char *source, char *destination, size_t xfer, size_t length);
 
     void ssh_error(ssh_t *ssh);
     char *ssh_error_str(ssh_t *ssh);
@@ -73,8 +74,13 @@
     int ssh_authenticate_kb_interactive(ssh_t *ssh, char *username, char *password);
 
     ssh_command_t *ssh_execute(ssh_t *ssh, char *command);
+    ssh_command_t *ssh_execute_callback(ssh_t *ssh, char *command, ssh_execute_cb_t cb);
+    char *ssh_command_stdout_get(ssh_command_t *command);
 
     int ssh_file_download(ssh_t *ssh, char *remotepath, char *localpath);
     int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile);
+
+    int ssh_file_download_progress(ssh_t *ssh, char *remotepath, char *localpath, ssh_scp_cb_t progress);
+    int ssh_file_upload_progress(ssh_t *ssh, char *localfile, char *remotefile, ssh_scp_cb_t progress);
 
 #endif

@@ -282,7 +282,7 @@ static int ssh_command_read(ssh_t *ssh, ssh_command_t *command, ssh_execute_cb_t
     }
 }
 
-static ssh_command_t *ssh_execute_callback(ssh_t *ssh, char *command, ssh_execute_cb_t cb) {
+ssh_command_t *ssh_execute_callback(ssh_t *ssh, char *command, ssh_execute_cb_t cb) {
     int rc;
 
     if((ssh->channel = libssh2_channel_open_session(ssh->session)) == NULL) {
@@ -372,7 +372,10 @@ int ssh_file_download_progress(ssh_t *ssh, char *remotepath, char *localpath, ss
     if((fd = creat(localpath, 0664)) < 0)
         return ssh_error_set(ssh, "open", 1);
 
-    printf("[+] reading %lu bytes from remote host\n", fileinfo.st_size);
+    debug("[+] reading %lu bytes from remote host\n", fileinfo.st_size);
+
+    if(progress)
+        progress(ssh, remotepath, localpath, 0, fileinfo.st_size);
 
     while(got < fileinfo.st_size) {
         char buffer[1024];
@@ -393,6 +396,9 @@ int ssh_file_download_progress(ssh_t *ssh, char *remotepath, char *localpath, ss
         }
 
         got += length;
+
+        if(progress)
+            progress(ssh, remotepath, localpath, got, fileinfo.st_size);
     }
 
     close(fd);
@@ -401,8 +407,13 @@ int ssh_file_download_progress(ssh_t *ssh, char *remotepath, char *localpath, ss
     return 0;
 }
 
-int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
+int ssh_file_download(ssh_t *ssh, char *remotepath, char *localpath) {
+    return ssh_file_download_progress(ssh, remotepath, localpath, NULL);
+}
+
+int ssh_file_upload_progress(ssh_t *ssh, char *localfile, char *remotefile, ssh_scp_cb_t progress) {
     struct stat sb;
+    size_t sent;
     int length;
     int fd;
     int rc;
@@ -414,32 +425,26 @@ int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
     if((ssh->channel = libssh2_scp_send(ssh->session, remotefile, mode, sb.st_size)) == NULL)
         return ssh_error_custom_set(ssh, "send", "could not open scp send channel", 1);
 
-    printf("[+] preparing to send %lu bytes (%s -> %s)\n", sb.st_size, localfile, remotefile);
-    /*
-    if(!channel) {
-        char *errmsg;
-        int errlen;
-        int err = libssh2_session_last_error(session, &errmsg, &errlen, 0);
-        fprintf(stderr, "Unable to open a session: (%d) %s\n", err, errmsg);
-        goto shutdown;
-    }
-    */
+    debug("[+] preparing to send %lu bytes (%s -> %s)\n", sb.st_size, localfile, remotefile);
 
     // if stat worked, should not fails
     if((fd = open(localfile, O_RDONLY)) < 0)
         return ssh_error_set(ssh, "open", 1);
 
-    printf("[+] sending file ");
+    sent = 0;
+    debug("[+] sending file ");
+
     do {
         char buffer[1024];
-
-        printf(".");
-        fflush(stdout);
 
         if((length = read(fd, buffer, sizeof(buffer))) <= 0)
             break;
 
         char *ptr = buffer;
+
+        // it's not yet sent, but length will be 0 when sucessuffly sent, so
+        // incrementing stats now
+        sent += length;
 
         do {
             if((rc = libssh2_channel_write(ssh->channel, ptr, length)) < 0) {
@@ -467,6 +472,10 @@ int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
     libssh2_channel_wait_closed(ssh->channel);
 
     return 0;
+}
+
+int ssh_file_upload(ssh_t *ssh, char *localfile, char *remotefile) {
+    return ssh_file_upload_progress(ssh, localfile, remotefile, NULL);
 }
 
 void ssh_command_free(ssh_command_t *cmd) {
@@ -554,23 +563,28 @@ int demo(int argc, char *argv[]) {
     // ssh_file_download(ssh, "/etc/passwd");
     // ssh_file_upload(ssh, "/etc/passwd", "/tmp/passwd-scp");
 
-    ssh_command_t *cmd = ssh_execute_stream(ssh, "dmidecode");
-    if(cmd) {
-        printf("<< command: %s\n", cmd->command);
-        printf("<< exit code: %d\n", cmd->exitcode);
-        printf("<< exit signal: %s\n", cmd->exitsignal);
-        printf("<< bytes read: %ld\n", cmd->bytesread);
+    // printf("[+] sending file (silent)\n");
+    // ssh_file_upload(ssh, "/tmp/ssh-source", "/tmp/ssh-test");
 
-        char *x = ssh_command_stdout_get(cmd);
-        // fwrite(x, cmd->bytesread, 1, stdout);
-        free(x);
-    }
+    printf("[+] sending file (with progress)\n");
+    ssh_file_upload_progress(ssh, "/tmp/ssh-source", "/tmp/ssh-test", ssh_scp_progress_cb);
+
+    // printf("[+] downloading file (silent)\n");
+    // ssh_file_download(ssh, "/tmp/ssh-test", "/tmp/ssh-download");
+
+    printf("[+] downloading file (with progress)\n");
+    ssh_file_download_progress(ssh, "/tmp/ssh-test", "/tmp/ssh-download", ssh_scp_progress_cb);
+
+    ssh_command_t *cmd = ssh_execute(ssh, "dmidecode");
+    ssh_command_dump(cmd);
     ssh_command_free(cmd);
 
     cmd = ssh_execute(ssh, "uname -a");
+    ssh_command_dump(cmd);
     ssh_command_free(cmd);
 
     cmd = ssh_execute(ssh, "false");
+    ssh_command_dump(cmd);
     ssh_command_free(cmd);
 
     ssh_session_disconnect(ssh);
