@@ -83,4 +83,10 @@
     int ssh_file_download_progress(ssh_t *ssh, char *remotepath, char *localpath, ssh_scp_cb_t progress);
     int ssh_file_upload_progress(ssh_t *ssh, char *localfile, char *remotefile, ssh_scp_cb_t progress);
 
+    int ssh_command_exit_code(ssh_command_t *cmd);
+    size_t ssh_command_bytes_read(ssh_command_t *cmd);
+    char *ssh_command_command_name(ssh_command_t *cmd);
+    char *ssh_command_stdout(ssh_command_t *cmd);
+    char *ssh_command_exit_signal(ssh_command_t *cmd);
+
 #endif

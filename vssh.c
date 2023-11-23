@@ -509,6 +509,26 @@ void ssh_command_free(ssh_command_t *cmd) {
     free(cmd);
 }
 
+int ssh_command_exit_code(ssh_command_t *cmd) {
+    return cmd->exitcode;
+}
+
+size_t ssh_command_bytes_read(ssh_command_t *cmd) {
+    return cmd->bytesread;
+}
+
+char *ssh_command_command_name(ssh_command_t *cmd) {
+    return cmd->command;
+}
+
+char *ssh_command_stdout(ssh_command_t *cmd) {
+    return ssh_command_stdout_get(cmd);
+}
+
+char *ssh_command_exit_signal(ssh_command_t *cmd) {
+    return cmd->exitsignal;
+}
+
 int demo(int argc, char *argv[]) {
     char *host = "10.241.0.230";
     char *port = "22";
