@@ -13,6 +13,7 @@ struct C.ssh_t {}
 struct C.ssh_command_t{}
 
 struct SSH2Exec {
+pub:
 	stdout string
 	exitcode int
 	exitsignal string
@@ -42,12 +43,16 @@ fn C.ssh_authenticate_kb_interactive(&C.ssh_t, &char, &char) int
 
 fn C.ssh_execute(&C.ssh_t, &char) &C.ssh_command_t
 
+fn C.ssh_execute_stream(&C.ssh_t, &char) &C.ssh_command_t
+
 fn C.ssh_execute_callback(&C.ssh_t, &char, cb FnSSHExecuteCB) &C.ssh_command_t
 
 fn C.ssh_command_exit_signal(&C.ssh_command_t) &char
 fn C.ssh_command_command_name(&C.ssh_command_t) &char
 fn C.ssh_command_exit_code(&C.ssh_command_t) int
 fn C.ssh_command_stdout(&C.ssh_command_t) &char
+
+fn C.ssh_file_upload(&C.ssh_t, &char, &char) int
 
 fn C.ssh_session_disconnect(&C.ssh_t)
 
@@ -174,7 +179,22 @@ fn stream_stdout(ssh &C.ssh_t, cmd &C.ssh_command_t, buffer &char, length usize)
 }
 
 pub fn (s SSH2) stream(command string) !int {
-	C.ssh_execute_callback(s.kntxt, command.str, stream_stdout)
+	// C.ssh_execute_callback(s.kntxt, command.str, stream_stdout)
+	C.ssh_execute_stream(s.kntxt, command.str)
+	return 0
+}
+/*
+
+pub fn (s SSH2) download(remote string, local string) !usize {
+	println("downloading from {remote} to {local}")
+	return 0
+}
+*/
+
+pub fn (s SSH2) upload(local string, remote string) !usize {
+	println("[+] uploading from $local to $remote")
+	C.ssh_file_upload(s.kntxt, local.str, remote.str)
+	
 	return 0
 }
 
